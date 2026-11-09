@@ -12,7 +12,8 @@ import java.util.Locale;
 
 /** Einstellungsmenü – erreichbar über Mod Menu (oder eine eigene Taste). */
 public class ConfigScreen extends Screen {
-	private static final int ROW = 24;
+	private static final int ROW = 22;
+	private static final int TOP = 28;
 	private final Screen parent;
 
 	public ConfigScreen(Screen parent) {
@@ -26,24 +27,27 @@ public class ConfigScreen extends Screen {
 		int cx = this.width / 2;
 		int leftX = cx - 155;
 		int rightX = cx + 5;
-		int y = 30;
 
 		// Hauptschalter
 		addRenderableWidget(Button.builder(
 						label(Component.translatable("cooldowntracker.config.enabled"), c.enabled),
 						b -> { c.enabled = !c.enabled; changed(); })
-				.bounds(leftX, y, 310, 20).build());
+				.bounds(leftX, TOP, 310, 20).build());
 
-		int startY = y + ROW + 14;
+		int startY = TOP + ROW + 12;
 
-		// ---------- Linke Spalte: Cooldowns
-		y = startY;
+		// ---------- Linke Spalte: Cooldowns  [an/aus (Dauer)] [Farbe] [-] [+]
+		int y = startY;
 		for (CooldownType type : CooldownType.values()) {
 			Component text = Component.empty()
 					.append(label(type.displayName(), type.isEnabled(c)))
-					.append(Component.literal(" (" + type.seconds(c) + "s)").withStyle(ChatFormatting.GRAY));
+					.append(Component.literal(" " + type.seconds(c) + "s").withStyle(ChatFormatting.GRAY));
 			addRenderableWidget(Button.builder(text, b -> { type.setEnabled(c, !type.isEnabled(c)); changed(); })
-					.bounds(leftX, y, 106, 20).build());
+					.bounds(leftX, y, 84, 20).build());
+			int rgb = type.color(c);
+			addRenderableWidget(Button.builder(Component.literal("█").withStyle(s -> s.withColor(rgb)),
+							b -> this.minecraft.setScreen(new ColorScreen(this, type)))
+					.bounds(leftX + 86, y, 20, 20).build());
 			addRenderableWidget(Button.builder(Component.literal("-"),
 							b -> { type.setSeconds(c, type.seconds(c) - type.step()); changed(); })
 					.bounds(leftX + 108, y, 20, 20).build());
@@ -57,12 +61,23 @@ public class ConfigScreen extends Screen {
 								Component.translatable("cooldowntracker.spear_trigger." + c.spearTrigger.name().toLowerCase(Locale.ROOT))),
 						b -> { c.spearTrigger = c.spearTrigger.next(); changed(); })
 				.bounds(leftX, y, 150, 20).build());
+		y += ROW;
+		addRenderableWidget(Button.builder(
+						label(Component.translatable("cooldowntracker.config.color_by_time"), c.colorByTime),
+						b -> { c.colorByTime = !c.colorByTime; changed(); })
+				.bounds(leftX, y, 150, 20).build());
 
 		// ---------- Rechte Spalte: Anzeige
 		y = startY;
 		addRenderableWidget(Button.builder(
-						label(Component.translatable("cooldowntracker.config.icons"), c.showIcons),
-						b -> { c.showIcons = !c.showIcons; changed(); })
+						Component.translatable("cooldowntracker.config.style",
+								Component.translatable("cooldowntracker.style." + c.style.name().toLowerCase(Locale.ROOT))),
+						b -> { c.style = c.style.next(); changed(); })
+				.bounds(rightX, y, 150, 20).build());
+		y += ROW;
+		addRenderableWidget(Button.builder(
+						label(Component.translatable("cooldowntracker.config.background"), c.background),
+						b -> { c.background = !c.background; changed(); })
 				.bounds(rightX, y, 150, 20).build());
 		y += ROW;
 		addRenderableWidget(Button.builder(
@@ -102,7 +117,7 @@ public class ConfigScreen extends Screen {
 				.bounds(rightX + 130, y, 20, 20).build());
 
 		// ---------- Unten
-		int bottom = this.height - 28;
+		int bottom = this.height - 26;
 		addRenderableWidget(Button.builder(Component.translatable("cooldowntracker.config.keybinds"),
 						b -> this.minecraft.setScreen(new KeyBindsScreen(this, this.minecraft.options)))
 				.bounds(leftX, bottom, 150, 20).build());
@@ -124,8 +139,8 @@ public class ConfigScreen extends Screen {
 	@Override
 	public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
 		super.render(g, mouseX, mouseY, delta);
-		g.drawCenteredString(this.font, this.title, this.width / 2, 12, 0xFFFFFFFF);
-		int labelY = 30 + ROW + 3;
+		g.drawCenteredString(this.font, this.title, this.width / 2, 10, 0xFFFFFFFF);
+		int labelY = TOP + ROW + 1;
 		g.drawString(this.font, Component.translatable("cooldowntracker.config.section.cooldowns"),
 				this.width / 2 - 155, labelY, 0xFFFFDD55, true);
 		g.drawString(this.font, Component.translatable("cooldowntracker.config.section.display"),

@@ -79,6 +79,25 @@ public enum CooldownType {
 		}
 	}
 
+	public int color(ModConfig c) {
+		return switch (this) {
+			case WIND_CHARGE -> c.windChargeColor;
+			case ENDER_PEARL -> c.enderPearlColor;
+			case SPEAR -> c.spearColor;
+			case ENCHANTED_GOLDEN_APPLE -> c.enchantedGoldenAppleColor;
+		} & 0xFFFFFF;
+	}
+
+	public void setColor(ModConfig c, int rgb) {
+		rgb &= 0xFFFFFF;
+		switch (this) {
+			case WIND_CHARGE -> c.windChargeColor = rgb;
+			case ENDER_PEARL -> c.enderPearlColor = rgb;
+			case SPEAR -> c.spearColor = rgb;
+			case ENCHANTED_GOLDEN_APPLE -> c.enchantedGoldenAppleColor = rgb;
+		}
+	}
+
 	/** Schrittweite für +/- im Menü. */
 	public int step() {
 		return this == ENCHANTED_GOLDEN_APPLE ? 10 : 1;

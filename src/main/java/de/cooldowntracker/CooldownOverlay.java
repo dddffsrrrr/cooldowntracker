@@ -8,6 +8,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
+import org.joml.Vector4f;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,15 +17,19 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Zeichnet die Cooldowns über den Köpfen der Spieler.
- * Die Weltposition über dem Kopf wird jeden Frame auf den Bildschirm projiziert.
+ * Zeichnet die Cooldowns über den Köpfen der Spieler (über dem Namensschild).
+ * Die Weltposition wird jeden Frame exakt so wie von Minecraft (inkl. FOV und Kamera-Wackeln) projiziert.
  */
 public final class CooldownOverlay {
-	private static final int BG_COLOR = 0x90000000;
+	private static final int BG_COLOR = 0x60000000;
+	/** Pixelgröße der Schrift in der Welt – gleich wie beim Namensschild. */
+	private static final double WORLD_PIXEL = 0.025;
+	/** Höhe über dem Hitbox-Oberrand (Namensschild sitzt bei +0.5). */
+	private static final double HEIGHT_ABOVE = 0.78;
 
-	private record Entry(CooldownType type, long remainingMs, String text, int color) {}
+	private record Entry(CooldownType type, String text, int color) {}
 
-	private record Target(Player player, double distance, float sx, float sy, List<Entry> entries) {}
+	private record Target(double depth, float sx, float sy, float scale, List<Entry> entries) {}
 
 	private CooldownOverlay() {}
 
@@ -40,9 +46,7 @@ public final class CooldownOverlay {
 
 		// --- Kamera
 		Vec3 cam = CameraCapture.pos;
-		if (cam == null || now - CameraCapture.posTimeMillis > 250 || mc.options.getCameraType().isFirstPerson()) {
-			cam = camEntity.getEyePosition(pt);
-		}
+		if (cam == null || now - CameraCapture.posTimeMillis > 250) cam = camEntity.getEyePosition(pt);
 		float yaw = camEntity.getViewYRot(pt);
 		float pitch = camEntity.getViewXRot(pt);
 		if (mc.options.getCameraType().isMirrored()) {
@@ -52,6 +56,7 @@ public final class CooldownOverlay {
 		float fov = (CameraCapture.fov > 0 && now - CameraCapture.fovTimeMillis < 250)
 				? CameraCapture.fov
 				: mc.options.fov().get().floatValue();
+		Matrix4f bob = (CameraCapture.bob != null && now - CameraCapture.bobTimeMillis < 250) ? CameraCapture.bob : null;
 
 		double yawR = Math.toRadians(yaw), pitchR = Math.toRadians(pitch);
 		double cy = Math.cos(yawR), sy = Math.sin(yawR), cp = Math.cos(pitchR), sp = Math.sin(pitchR);
@@ -65,36 +70,44 @@ public final class CooldownOverlay {
 		double aspect = (double) winW / winH;
 		double focal = 1.0 / Math.tan(Math.toRadians(fov) / 2.0);
 		int guiW = g.guiWidth(), guiH = g.guiHeight();
+		Vector4f v = new Vector4f();
 
 		// --- Ziele sammeln
 		List<Target> targets = new ArrayList<>();
 		for (Player p : mc.level.players()) {
 			if (p == mc.player || p == camEntity) continue;
 			if (p.isSpectator() || p.isInvisibleTo(mc.player)) continue;
-			double dist = p.distanceTo(camEntity);
-			if (dist > cfg.maxDistance) continue;
+			if (p.distanceTo(camEntity) > cfg.maxDistance) continue;
 			if (cfg.onlyWithLineOfSight && !mc.player.hasLineOfSight(p)) continue;
 
 			List<Entry> entries = collect(p, cfg);
 			if (entries.isEmpty()) continue;
 
-			Vec3 head = p.getPosition(pt).add(0, p.getBbHeight() + 0.8, 0);
+			Vec3 head = p.getPosition(pt).add(0, p.getBbHeight() + HEIGHT_ABOVE, 0);
 			double dx = head.x - cam.x, dy = head.y - cam.y, dz = head.z - cam.z;
-			double z = dx * fx + dy * fy + dz * fz;
-			if (z < 0.1) continue; // hinter der Kamera
-			double x = dx * rx + dy * ry + dz * rz;
-			double y = dx * ux + dy * uy + dz * uz;
-			double ndcX = (x * focal) / (aspect * z);
-			double ndcY = (y * focal) / z;
+			// Kamera-Raum (OpenGL: x rechts, y oben, -z nach vorne)
+			v.set((float) (dx * rx + dy * ry + dz * rz),
+					(float) (dx * ux + dy * uy + dz * uz),
+					(float) -(dx * fx + dy * fy + dz * fz),
+					1f);
+			if (bob != null) bob.transform(v);
+			double depth = -v.z;
+			if (depth < 0.1) continue; // hinter der Kamera
+			double ndcX = (v.x * focal) / (aspect * depth);
+			double ndcY = (v.y * focal) / depth;
 			if (Math.abs(ndcX) > 1.3 || Math.abs(ndcY) > 1.3) continue;
+
 			float screenX = (float) ((ndcX + 1.0) * 0.5 * guiW);
 			float screenY = (float) ((1.0 - ndcY) * 0.5 * guiH);
-			targets.add(new Target(p, dist, screenX, screenY, entries));
+			// Gleiche Größe wie das Namensschild (wird mit Entfernung kleiner)
+			float scale = (float) (WORLD_PIXEL * guiH * 0.5 * focal / depth) * cfg.scale;
+			scale = Math.max(0.3f, Math.min(4f, scale));
+			targets.add(new Target(depth, screenX, screenY, scale, entries));
 		}
 		if (targets.isEmpty()) return;
 
 		// Weit entfernte zuerst, damit nahe Spieler oben liegen
-		targets.sort(Comparator.comparingDouble(Target::distance).reversed());
+		targets.sort(Comparator.comparingDouble(Target::depth).reversed());
 		for (Target t : targets) drawTarget(g, mc.font, cfg, t);
 	}
 
@@ -104,9 +117,14 @@ public final class CooldownOverlay {
 			if (!type.isEnabled(cfg)) continue;
 			long rem = CooldownTracker.remaining(p.getUUID(), type);
 			if (rem <= 0) continue;
-			double frac = rem / (type.seconds(cfg) * 1000.0);
-			int color = frac > 0.5 ? 0xFFFF5555 : frac > 0.2 ? 0xFFFFDD55 : 0xFF55FF55;
-			list.add(new Entry(type, rem, format(rem, cfg.showDecimals), color));
+			int color;
+			if (cfg.colorByTime) {
+				double frac = rem / (type.seconds(cfg) * 1000.0);
+				color = frac > 0.5 ? 0xFF5555 : frac > 0.2 ? 0xFFDD55 : 0x55FF55;
+			} else {
+				color = type.color(cfg);
+			}
+			list.add(new Entry(type, format(rem, cfg.showDecimals), 0xFF000000 | color));
 		}
 		return list;
 	}
@@ -121,14 +139,11 @@ public final class CooldownOverlay {
 	}
 
 	private static void drawTarget(GuiGraphics g, Font font, ModConfig cfg, Target t) {
-		float distScale = (float) Math.max(0.45, Math.min(1.25, 7.0 / Math.max(t.distance(), 0.1)));
-		float s = cfg.scale * distScale;
-
 		g.pose().pushMatrix();
 		g.pose().translate(t.sx(), t.sy());
-		g.pose().scale(s, s);
+		g.pose().scale(t.scale(), t.scale());
 
-		if (cfg.showIcons) {
+		if (cfg.style == ModConfig.Style.ICONS) {
 			int[] widths = new int[t.entries().size()];
 			int total = 0;
 			for (int i = 0; i < widths.length; i++) {
@@ -137,7 +152,7 @@ public final class CooldownOverlay {
 			}
 			int height = 28;
 			int left = -total / 2;
-			g.fill(left - 1, -height - 1, left + total + 1, 1, BG_COLOR);
+			if (cfg.background) g.fill(left - 1, -height - 1, left + total + 1, 1, BG_COLOR);
 			int x = left;
 			for (int i = 0; i < widths.length; i++) {
 				Entry e = t.entries().get(i);
@@ -148,19 +163,16 @@ public final class CooldownOverlay {
 				x += widths[i];
 			}
 		} else {
-			List<String> lines = new ArrayList<>();
-			int maxW = 0;
-			for (Entry e : t.entries()) {
-				String line = e.type().displayName().getString() + ": " + e.text();
-				lines.add(line);
-				maxW = Math.max(maxW, font.width(line));
-			}
+			// Text-Stil wie "Pearl: 8s" – eine Zeile pro Cooldown, von unten nach oben
 			int lineH = 10;
-			int height = lines.size() * lineH;
-			g.fill(-maxW / 2 - 2, -height - 2, maxW / 2 + 2, 1, BG_COLOR);
-			for (int i = 0; i < lines.size(); i++) {
-				String line = lines.get(i);
-				g.drawString(font, line, -font.width(line) / 2, -height + i * lineH, t.entries().get(i).color(), true);
+			int n = t.entries().size();
+			for (int i = 0; i < n; i++) {
+				Entry e = t.entries().get(i);
+				String line = e.type().displayName().getString() + ": " + e.text();
+				int w = font.width(line);
+				int y = -(n - i) * lineH;
+				if (cfg.background) g.fill(-w / 2 - 1, y - 1, w / 2 + 1, y + 9, BG_COLOR);
+				g.drawString(font, line, -w / 2, y, e.color(), true);
 			}
 		}
 

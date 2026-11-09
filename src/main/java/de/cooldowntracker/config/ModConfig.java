@@ -35,12 +35,29 @@ public final class ModConfig {
 	/** Wann der Speer-Cooldown startet. */
 	public SpearTrigger spearTrigger = SpearTrigger.ATTACK;
 
+	// Farben (RGB, z.B. 0xFF55AA)
+	public int windChargeColor = 0x55FFFF;
+	public int enderPearlColor = 0xFF55AA;
+	public int spearColor = 0xFFAA00;
+	public int enchantedGoldenAppleColor = 0xFFFF55;
+	/** true = Farbe wechselt nach Restzeit (rot -> gelb -> grün) statt eigener Farbe. */
+	public boolean colorByTime = false;
+
 	// Anzeige
-	public boolean showIcons = true;
-	public boolean showDecimals = true;
+	public Style style = Style.TEXT;
+	public boolean background = false;
+	public boolean showDecimals = false;
 	public boolean onlyWithLineOfSight = false;
 	public int maxDistance = 64;
 	public float scale = 1.0f;
+
+	public enum Style {
+		TEXT, ICONS;
+
+		public Style next() {
+			return values()[(ordinal() + 1) % values().length];
+		}
+	}
 
 	public enum SpearTrigger {
 		ATTACK, CHARGE, BOTH;
@@ -66,6 +83,7 @@ public final class ModConfig {
 		}
 		instance = cfg != null ? cfg : new ModConfig();
 		if (instance.spearTrigger == null) instance.spearTrigger = SpearTrigger.ATTACK;
+		if (instance.style == null) instance.style = Style.TEXT;
 		save();
 	}
 
