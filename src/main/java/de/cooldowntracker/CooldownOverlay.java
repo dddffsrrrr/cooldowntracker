@@ -46,7 +46,9 @@ public final class CooldownOverlay {
 
 		// --- Kamera
 		Vec3 cam = CameraCapture.pos;
-		if (cam == null || now - CameraCapture.posTimeMillis > 250) cam = camEntity.getEyePosition(pt);
+		if (cam == null || now - CameraCapture.posTimeMillis > 250 || mc.options.getCameraType().isFirstPerson()) {
+			cam = camEntity.getEyePosition(pt);
+		}
 		float yaw = camEntity.getViewYRot(pt);
 		float pitch = camEntity.getViewXRot(pt);
 		if (mc.options.getCameraType().isMirrored()) {
@@ -56,7 +58,11 @@ public final class CooldownOverlay {
 		float fov = (CameraCapture.fov > 0 && now - CameraCapture.fovTimeMillis < 250)
 				? CameraCapture.fov
 				: mc.options.fov().get().floatValue();
-		Matrix4f bob = (CameraCapture.bob != null && now - CameraCapture.bobTimeMillis < 250) ? CameraCapture.bob : null;
+		Matrix4f bob = null;
+		if (cfg.compensateBobbing && CameraCapture.bob != null && now - CameraCapture.bobTimeMillis < 250
+				&& isPlausibleBob(CameraCapture.bob)) {
+			bob = CameraCapture.bob;
+		}
 
 		double yawR = Math.toRadians(yaw), pitchR = Math.toRadians(pitch);
 		double cy = Math.cos(yawR), sy = Math.sin(yawR), cp = Math.cos(pitchR), sp = Math.sin(pitchR);
@@ -109,6 +115,20 @@ public final class CooldownOverlay {
 		// Weit entfernte zuerst, damit nahe Spieler oben liegen
 		targets.sort(Comparator.comparingDouble(Target::depth).reversed());
 		for (Target t : targets) drawTarget(g, mc.font, cfg, t);
+	}
+
+	/**
+	 * Das Kamera-Wackeln ist nur eine kleine Drehung/Verschiebung. Sieht die Matrix anders aus
+	 * (z.B. weil Minecraft dort mehr hineinrechnet), wird sie ignoriert, statt die Anzeige zu verschieben.
+	 */
+	private static boolean isPlausibleBob(Matrix4f m) {
+		if (!Float.isFinite(m.m00()) || !Float.isFinite(m.m11()) || !Float.isFinite(m.m22())) return false;
+		boolean nearRotation = m.m00() > 0.9f && m.m11() > 0.9f && m.m22() > 0.9f
+				&& Math.abs(m.m00()) < 1.1f && Math.abs(m.m11()) < 1.1f && Math.abs(m.m22()) < 1.1f;
+		boolean noPerspective = Math.abs(m.m03()) < 1e-3f && Math.abs(m.m13()) < 1e-3f
+				&& Math.abs(m.m23()) < 1e-3f && Math.abs(m.m33() - 1f) < 1e-3f;
+		boolean smallShift = Math.abs(m.m30()) < 0.3f && Math.abs(m.m31()) < 0.3f && Math.abs(m.m32()) < 0.3f;
+		return nearRotation && noPerspective && smallShift;
 	}
 
 	private static List<Entry> collect(Player p, ModConfig cfg) {

@@ -50,6 +50,8 @@ public final class ModConfig {
 	public boolean onlyWithLineOfSight = false;
 	public int maxDistance = 64;
 	public float scale = 1.0f;
+	/** Kamera-Wackeln (Laufen/Schaden) ausgleichen. Bei Problemen ausschalten. */
+	public boolean compensateBobbing = true;
 
 	public enum Style {
 		TEXT, ICONS;

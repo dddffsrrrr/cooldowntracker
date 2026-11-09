@@ -31,5 +31,6 @@
 	"cooldowntracker.style.icons": "Icons",
 	"cooldowntracker.config.background": "Background",
 	"cooldowntracker.color.title": "Color: %s",
-	"cooldowntracker.color.hex": "Hex code #"
+	"cooldowntracker.color.hex": "Hex code #",
+	"cooldowntracker.config.bobbing": "Bobbing fix"
 }

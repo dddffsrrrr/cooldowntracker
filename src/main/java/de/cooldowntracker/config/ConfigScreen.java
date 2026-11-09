@@ -90,6 +90,11 @@ public class ConfigScreen extends Screen {
 						b -> { c.onlyWithLineOfSight = !c.onlyWithLineOfSight; changed(); })
 				.bounds(rightX, y, 150, 20).build());
 		y += ROW;
+		addRenderableWidget(Button.builder(
+						label(Component.translatable("cooldowntracker.config.bobbing"), c.compensateBobbing),
+						b -> { c.compensateBobbing = !c.compensateBobbing; changed(); })
+				.bounds(rightX, y, 150, 20).build());
+		y += ROW;
 
 		// Größe
 		addRenderableWidget(Button.builder(
