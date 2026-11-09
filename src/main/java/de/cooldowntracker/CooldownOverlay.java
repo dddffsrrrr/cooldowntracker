@@ -101,13 +101,14 @@ public final class CooldownOverlay {
 			if (depth < 0.1) continue; // hinter der Kamera
 			double ndcX = (v.x * focal) / (aspect * depth);
 			double ndcY = (v.y * focal) / depth;
-			if (Math.abs(ndcX) > 1.3 || Math.abs(ndcY) > 1.3) continue;
+			// Seitlich/unten außerhalb -> weg. Oben (sehr nah) -> wird später am Rand festgehalten.
+			if (Math.abs(ndcX) > 1.3 || ndcY < -1.3 || ndcY > 6) continue;
 
 			float screenX = (float) ((ndcX + 1.0) * 0.5 * guiW);
 			float screenY = (float) ((1.0 - ndcY) * 0.5 * guiH);
 			// Gleiche Größe wie das Namensschild (wird mit Entfernung kleiner)
 			float scale = (float) (WORLD_PIXEL * guiH * 0.5 * focal / depth) * cfg.scale;
-			scale = Math.max(0.3f, Math.min(4f, scale));
+			scale = Math.max(0.35f, Math.min(1.6f, scale));
 			targets.add(new Target(depth, screenX, screenY, scale, entries));
 		}
 		if (targets.isEmpty()) return;
@@ -159,8 +160,23 @@ public final class CooldownOverlay {
 	}
 
 	private static void drawTarget(GuiGraphics g, Font font, ModConfig cfg, Target t) {
+		// Größe der Anzeige (unten-mittig verankert) bestimmen, um sie im Bild zu halten
+		int boxW, boxH;
+		if (cfg.style == ModConfig.Style.ICONS) {
+			boxW = 0;
+			for (Entry e : t.entries()) boxW += Math.max(16, font.width(e.text())) + 4;
+			boxH = 28;
+		} else {
+			boxW = 0;
+			for (Entry e : t.entries()) boxW = Math.max(boxW, font.width(e.type().displayName().getString() + ": " + e.text()));
+			boxH = t.entries().size() * 10;
+		}
+		float halfW = boxW * t.scale() / 2f, h = boxH * t.scale();
+		float sx = Math.max(halfW + 2, Math.min(g.guiWidth() - halfW - 2, t.sx()));
+		float sy = Math.max(h + 2, Math.min(g.guiHeight() - 2, t.sy()));
+
 		g.pose().pushMatrix();
-		g.pose().translate(t.sx(), t.sy());
+		g.pose().translate(sx, sy);
 		g.pose().scale(t.scale(), t.scale());
 
 		if (cfg.style == ModConfig.Style.ICONS) {
