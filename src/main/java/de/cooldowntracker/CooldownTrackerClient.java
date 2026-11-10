@@ -8,9 +8,6 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -57,13 +54,7 @@ public class CooldownTrackerClient implements ClientModInitializer {
 		});
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> CooldownTracker.clear());
 
-		// --- Rendering
-		WorldRenderEvents.BEFORE_TRANSLUCENT.register(context -> {
-			CameraCapture.pos = context.worldState().cameraRenderState.pos;
-			CameraCapture.posTimeMillis = System.currentTimeMillis();
-		});
-		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT,
-				Identifier.fromNamespaceAndPath(MOD_ID, "head_cooldowns"), CooldownOverlay::render);
+		// Rendering passiert per Mixin direkt beim Zeichnen der Spieler (siehe CooldownWorldRenderer)
 	}
 
 	private static void handleKeys(Minecraft client) {

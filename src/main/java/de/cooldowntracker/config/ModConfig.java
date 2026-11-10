@@ -44,22 +44,13 @@ public final class ModConfig {
 	public boolean colorByTime = false;
 
 	// Anzeige
-	public Style style = Style.TEXT;
+	/** Durch Wände sichtbar (wie das Namensschild eines nicht schleichenden Spielers). */
+	public boolean seeThroughWalls = true;
 	public boolean background = false;
 	public boolean showDecimals = false;
 	public boolean onlyWithLineOfSight = false;
 	public int maxDistance = 64;
 	public float scale = 1.0f;
-	/** Kamera-Wackeln (Laufen/Schaden) ausgleichen. Bei Problemen ausschalten. */
-	public boolean compensateBobbing = true;
-
-	public enum Style {
-		TEXT, ICONS;
-
-		public Style next() {
-			return values()[(ordinal() + 1) % values().length];
-		}
-	}
 
 	public enum SpearTrigger {
 		ATTACK, CHARGE, BOTH;
@@ -85,7 +76,6 @@ public final class ModConfig {
 		}
 		instance = cfg != null ? cfg : new ModConfig();
 		if (instance.spearTrigger == null) instance.spearTrigger = SpearTrigger.ATTACK;
-		if (instance.style == null) instance.style = Style.TEXT;
 		save();
 	}
 

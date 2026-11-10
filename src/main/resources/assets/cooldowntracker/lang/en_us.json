@@ -26,11 +26,8 @@
 	"key.cooldowntracker.toggle_spear": "Toggle Spear",
 	"key.cooldowntracker.toggle_enchanted_golden_apple": "Toggle Ench. Gapple",
 	"cooldowntracker.config.color_by_time": "Color by time",
-	"cooldowntracker.config.style": "Style: %s",
-	"cooldowntracker.style.text": "Text",
-	"cooldowntracker.style.icons": "Icons",
 	"cooldowntracker.config.background": "Background",
 	"cooldowntracker.color.title": "Color: %s",
 	"cooldowntracker.color.hex": "Hex code #",
-	"cooldowntracker.config.bobbing": "Bobbing fix"
+	"cooldowntracker.config.see_through": "Through walls"
 }

@@ -4,7 +4,8 @@
 	"package": "de.cooldowntracker.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"GameRendererMixin"
+		"EntityRenderStateMixin",
+		"EntityRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

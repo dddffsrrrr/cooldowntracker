@@ -70,9 +70,8 @@ public class ConfigScreen extends Screen {
 		// ---------- Rechte Spalte: Anzeige
 		y = startY;
 		addRenderableWidget(Button.builder(
-						Component.translatable("cooldowntracker.config.style",
-								Component.translatable("cooldowntracker.style." + c.style.name().toLowerCase(Locale.ROOT))),
-						b -> { c.style = c.style.next(); changed(); })
+						label(Component.translatable("cooldowntracker.config.see_through"), c.seeThroughWalls),
+						b -> { c.seeThroughWalls = !c.seeThroughWalls; changed(); })
 				.bounds(rightX, y, 150, 20).build());
 		y += ROW;
 		addRenderableWidget(Button.builder(
@@ -88,11 +87,6 @@ public class ConfigScreen extends Screen {
 		addRenderableWidget(Button.builder(
 						label(Component.translatable("cooldowntracker.config.line_of_sight"), c.onlyWithLineOfSight),
 						b -> { c.onlyWithLineOfSight = !c.onlyWithLineOfSight; changed(); })
-				.bounds(rightX, y, 150, 20).build());
-		y += ROW;
-		addRenderableWidget(Button.builder(
-						label(Component.translatable("cooldowntracker.config.bobbing"), c.compensateBobbing),
-						b -> { c.compensateBobbing = !c.compensateBobbing; changed(); })
 				.bounds(rightX, y, 150, 20).build());
 		y += ROW;
 
