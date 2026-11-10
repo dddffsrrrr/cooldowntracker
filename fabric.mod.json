@@ -1,0 +1,24 @@
+{
+	"schemaVersion": 1,
+	"id": "cooldowntracker",
+	"version": "${version}",
+	"name": "Cooldown Tracker",
+	"description": "Zeigt die Cooldowns von Wind Charge, Enderperle, Speer und verzaubertem goldenen Apfel über den Köpfen gegnerischer Spieler an.",
+	"authors": ["muhaimeri"],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["de.cooldowntracker.CooldownTrackerClient"],
+		"modmenu": ["de.cooldowntracker.config.ModMenuIntegration"]
+	},
+	"mixins": ["cooldowntracker.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.18.1",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"recommends": {
+		"modmenu": ">=17.0.0"
+	}
+}
