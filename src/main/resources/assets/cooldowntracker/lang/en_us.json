@@ -9,10 +9,6 @@
 	"cooldowntracker.config.enabled": "Show above heads",
 	"cooldowntracker.config.section.cooldowns": "Cooldowns (on/off, duration)",
 	"cooldowntracker.config.section.display": "Display",
-	"cooldowntracker.config.spear_trigger": "Spear on: %s",
-	"cooldowntracker.spear_trigger.attack": "Attack",
-	"cooldowntracker.spear_trigger.charge": "Charge",
-	"cooldowntracker.spear_trigger.both": "Both",
 	"cooldowntracker.config.decimals": "Decimals",
 	"cooldowntracker.config.line_of_sight": "Only in sight",
 	"cooldowntracker.config.scale": "Size: %sx",
@@ -29,5 +25,13 @@
 	"cooldowntracker.config.background": "Background",
 	"cooldowntracker.color.title": "Color: %s",
 	"cooldowntracker.color.hex": "Hex code #",
-	"cooldowntracker.config.see_through": "Through walls"
+	"cooldowntracker.config.see_through": "Through walls",
+	"cooldowntracker.config.lunge": "Lunge: %s",
+	"cooldowntracker.lunge.enchantment": "Enchantment",
+	"cooldowntracker.lunge.movement": "Movement",
+	"cooldowntracker.lunge.both": "Both",
+	"cooldowntracker.config.style": "Style: %s",
+	"cooldowntracker.style.text": "Text",
+	"cooldowntracker.style.icon": "Icon + time",
+	"cooldowntracker.style.icon_text": "Icon + text"
 }

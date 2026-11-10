@@ -3,6 +3,7 @@ package de.cooldowntracker;
 import de.cooldowntracker.config.ModConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -11,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantment;
 
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -31,14 +33,27 @@ public final class CooldownTracker {
 	/** Pro Spieler: Zustand vom letzten Tick (für Flanken-Erkennung). */
 	private static final Map<UUID, PlayerState> STATES = new HashMap<>();
 
-	private static final int GAPPLE_MIN_USE_TICKS = 28; // Essen dauert 32 Ticks
+	/** Essen dauert 32 Ticks; ab 30 Ticks am Stück gilt der Apfel als gegessen. */
+	private static final int GAPPLE_EAT_TICKS = 30;
+	/** Verzauberter goldener Apfel gibt Absorption IV = 16 Extra-HP. */
+	private static final float GAPPLE_ABSORPTION = 15.5f;
+	/** Zwei Erkennungen desselben Apfels innerhalb dieser Zeit zählen nur einmal. */
+	private static final long GAPPLE_DEBOUNCE_MS = 4000;
+	/** Lunge-Bewegung: so viele Ticks nach dem Stoß wird auf den Vorwärtsschub gewartet. */
+	private static final int LUNGE_WINDOW_TICKS = 8;
+	/** Mindest-Geschwindigkeit (Blöcke/Tick) und Mindest-Zuwachs für einen Lunge-Schub. */
+	private static final double LUNGE_MIN_SPEED = 0.45;
+	private static final double LUNGE_MIN_GAIN = 0.15;
 	private static int pruneCounter = 0;
 
 	private static final class PlayerState {
 		int gappleUseTicks;
-		boolean wasUsingSpear;
+		float lastAbsorption = -1;
+		long lastGappleMs;
 		boolean wasSwinging;
 		int lastSwingTime;
+		int lungeWindow;
+		double speedAtSwing;
 	}
 
 	private CooldownTracker() {}
@@ -116,30 +131,43 @@ public final class CooldownTracker {
 			UUID id = p.getUUID();
 			PlayerState s = STATES.computeIfAbsent(id, k -> new PlayerState());
 
-			// --- Verzauberter goldener Apfel: Essen bis zum Ende
+			// --- Verzauberter goldener Apfel
+			// (a) Spieler isst ihn bis zum Ende (wird ausgelöst, sobald fertig gegessen – auch wenn er weiter Rechtsklick hält)
 			boolean eatingGapple = p.isUsingItem() && p.getUseItem().is(Items.ENCHANTED_GOLDEN_APPLE);
 			if (eatingGapple) {
 				s.gappleUseTicks++;
+				if (s.gappleUseTicks == GAPPLE_EAT_TICKS) gapple(id, s);
+				if (s.gappleUseTicks >= 32) s.gappleUseTicks = 0; // nächster Apfel direkt hintereinander
 			} else {
-				if (s.gappleUseTicks >= GAPPLE_MIN_USE_TICKS) trigger(id, CooldownType.ENCHANTED_GOLDEN_APPLE);
 				s.gappleUseTicks = 0;
 			}
-
-			// --- Speer: Aufladen (Rechtsklick halten)
-			boolean usingSpear = p.isUsingItem() && isSpear(p.getUseItem());
-			if (usingSpear && !s.wasUsingSpear && cfg.spearTrigger != ModConfig.SpearTrigger.ATTACK) {
-				trigger(id, CooldownType.SPEAR);
+			// (b) Absorption springt auf 16 (nur der verzauberte goldene Apfel gibt Absorption IV)
+			float absorption = p.getAbsorptionAmount();
+			if (s.lastAbsorption >= 0 && absorption >= GAPPLE_ABSORPTION && s.lastAbsorption < GAPPLE_ABSORPTION - 0.01f) {
+				gapple(id, s);
 			}
-			s.wasUsingSpear = usingSpear;
+			s.lastAbsorption = absorption;
 
-			// --- Speer: Angriff (Schwung mit Speer in der Haupthand)
+			// --- Speer: nur wenn der Spieler LUNGED (Stoß mit Lunge-Speer)
 			boolean newSwing = p.swinging && (!s.wasSwinging || p.swingTime < s.lastSwingTime);
-			if (newSwing && p.swingingArm == InteractionHand.MAIN_HAND && isSpear(p.getMainHandItem())
-					&& cfg.spearTrigger != ModConfig.SpearTrigger.CHARGE) {
-				trigger(id, CooldownType.SPEAR);
-			}
 			s.wasSwinging = p.swinging;
 			s.lastSwingTime = p.swingTime;
+			double speed = Math.hypot(p.getX() - p.xo, p.getZ() - p.zo);
+
+			if (newSwing && p.swingingArm == InteractionHand.MAIN_HAND && isSpear(p.getMainHandItem())) {
+				boolean lungeSpear = hasLunge(p.getMainHandItem());
+				switch (cfg.lungeDetection) {
+					case ENCHANTMENT -> { if (lungeSpear) trigger(id, CooldownType.SPEAR); }
+					case MOVEMENT -> { s.lungeWindow = LUNGE_WINDOW_TICKS; s.speedAtSwing = speed; }
+					case BOTH -> { if (lungeSpear) { s.lungeWindow = LUNGE_WINDOW_TICKS; s.speedAtSwing = speed; } }
+				}
+			} else if (s.lungeWindow > 0) {
+				s.lungeWindow--;
+				if (speed >= LUNGE_MIN_SPEED && speed >= s.speedAtSwing + LUNGE_MIN_GAIN) {
+					trigger(id, CooldownType.SPEAR);
+					s.lungeWindow = 0;
+				}
+			}
 		}
 
 		// Ab und zu aufräumen
@@ -156,6 +184,21 @@ public final class CooldownTracker {
 				if (m.isEmpty()) it.remove();
 			}
 		}
+	}
+
+	private static void gapple(UUID id, PlayerState s) {
+		long now = System.currentTimeMillis();
+		if (now - s.lastGappleMs < GAPPLE_DEBOUNCE_MS) return;
+		s.lastGappleMs = now;
+		trigger(id, CooldownType.ENCHANTED_GOLDEN_APPLE);
+	}
+
+	/** Hat der Speer die Verzauberung "Lunge" (Ausfall)? Verzauberungen anderer Spieler sieht der Client. */
+	public static boolean hasLunge(ItemStack stack) {
+		for (Holder<Enchantment> ench : stack.getEnchantments().keySet()) {
+			if (ench.getRegisteredName().endsWith("lunge")) return true;
+		}
+		return false;
 	}
 
 	public static boolean isSpear(ItemStack stack) {

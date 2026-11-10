@@ -32,8 +32,8 @@ public final class ModConfig {
 	public int spearSeconds = 10;
 	public int enchantedGoldenAppleSeconds = 120;
 
-	/** Wann der Speer-Cooldown startet. */
-	public SpearTrigger spearTrigger = SpearTrigger.ATTACK;
+	/** Wie ein Lunge (Speer-Stoß mit Lunge-Verzauberung) erkannt wird. */
+	public LungeDetection lungeDetection = LungeDetection.ENCHANTMENT;
 
 	// Farben (RGB, z.B. 0xFF55AA)
 	public int windChargeColor = 0x55FFFF;
@@ -44,6 +44,8 @@ public final class ModConfig {
 	public boolean colorByTime = false;
 
 	// Anzeige
+	/** Text, Icon + Zeit, oder Icon + Text. */
+	public Style style = Style.TEXT;
 	/** Durch Wände sichtbar (wie das Namensschild eines nicht schleichenden Spielers). */
 	public boolean seeThroughWalls = true;
 	public boolean background = false;
@@ -52,10 +54,28 @@ public final class ModConfig {
 	public int maxDistance = 64;
 	public float scale = 1.0f;
 
-	public enum SpearTrigger {
-		ATTACK, CHARGE, BOTH;
+	public enum Style {
+		/** "Pearl: 8s" */
+		TEXT,
+		/** [Bild] 8s */
+		ICON,
+		/** [Bild] Pearl: 8s */
+		ICON_TEXT;
 
-		public SpearTrigger next() {
+		public Style next() {
+			return values()[(ordinal() + 1) % values().length];
+		}
+	}
+
+	public enum LungeDetection {
+		/** Stoß mit einem Speer, der "Lunge" hat. */
+		ENCHANTMENT,
+		/** Stoß mit Speer + der Spieler schießt nach vorne. */
+		MOVEMENT,
+		/** Beides muss zutreffen (am strengsten). */
+		BOTH;
+
+		public LungeDetection next() {
 			return values()[(ordinal() + 1) % values().length];
 		}
 	}
@@ -75,7 +95,8 @@ public final class ModConfig {
 			}
 		}
 		instance = cfg != null ? cfg : new ModConfig();
-		if (instance.spearTrigger == null) instance.spearTrigger = SpearTrigger.ATTACK;
+		if (instance.style == null) instance.style = Style.TEXT;
+		if (instance.lungeDetection == null) instance.lungeDetection = LungeDetection.ENCHANTMENT;
 		save();
 	}
 

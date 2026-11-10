@@ -6,10 +6,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.DisplaySlot;
 
@@ -29,6 +32,14 @@ public final class CooldownWorldRenderer {
 	private static final int LINE = 10;
 	/** Volle Helligkeit, damit die Farben auch im Dunkeln stimmen. */
 	private static final int FULL_BRIGHT = 0xF000F0;
+	/** Größe der Item-Bilder in Schrift-Pixeln. */
+	private static final int ICON = 10;
+	/** Ein Render-State pro Cooldown-Art (Bild ist für alle Spieler gleich). */
+	private static final ItemStackRenderState[] ICON_STATES = new ItemStackRenderState[CooldownType.values().length];
+
+	static {
+		for (int i = 0; i < ICON_STATES.length; i++) ICON_STATES[i] = new ItemStackRenderState();
+	}
 
 	private CooldownWorldRenderer() {}
 
@@ -56,8 +67,10 @@ public final class CooldownWorldRenderer {
 		ModConfig cfg = ModConfig.get();
 		if (!cfg.enabled) return;
 
+		boolean icons = cfg.style != ModConfig.Style.TEXT;
 		List<Component> lines = new ArrayList<>(4);
 		List<Integer> colors = new ArrayList<>(4);
+		List<CooldownType> types = new ArrayList<>(4);
 		for (CooldownType type : CooldownType.values()) {
 			if (!type.isEnabled(cfg)) continue;
 			long rem = CooldownTracker.remaining(id, type);
@@ -69,8 +82,11 @@ public final class CooldownWorldRenderer {
 			} else {
 				color = type.color(cfg);
 			}
-			lines.add(Component.literal(type.displayName().getString() + ": " + format(rem, cfg.showDecimals)));
+			String time = format(rem, cfg.showDecimals);
+			String text = cfg.style == ModConfig.Style.ICON ? time : type.displayName().getString() + ": " + time;
+			lines.add(Component.literal(text));
 			colors.add(0xFF000000 | color);
+			types.add(type);
 		}
 		if (lines.isEmpty()) return;
 
@@ -97,13 +113,32 @@ public final class CooldownWorldRenderer {
 
 		// Zeile 0 direkt über dem Namen (Unterkante 1 Pixel über dem Namen), weitere darüber.
 		// Ohne sichtbaren Namen steht Zeile 0 dort, wo der Name wäre.
+		int contentH = icons ? ICON : 9;
+		int rowH = icons ? ICON + 1 : LINE;
 		for (int i = 0; i < lines.size(); i++) {
 			Component line = lines.get(i);
-			float x = -font.width(line) / 2f;
-			float y = nameShown ? -(1f / cfg.scale) - 9 - i * LINE : -i * LINE;
-			collector.submitText(poseStack, x, y, line.getVisualOrderText(), true, mode,
+			int textW = font.width(line);
+			int totalW = icons ? ICON + 2 + textW : textW;
+			float left = -totalW / 2f;
+			float top = nameShown ? -(1f / cfg.scale) - contentH - i * rowH : -i * rowH;
+			float textX = icons ? left + ICON + 2 : left;
+			float textY = icons ? top + (ICON - 8) / 2f : top;
+			collector.submitText(poseStack, textX, textY, line.getVisualOrderText(), true, mode,
 					FULL_BRIGHT, colors.get(i), background, 0);
+			if (icons) submitIcon(poseStack, collector, types.get(i), left + ICON / 2f, top + ICON / 2f);
 		}
+		poseStack.popPose();
+	}
+
+	/** Item-Bild (wie im Inventar) an Position (cx, cy) in Schrift-Pixeln zeichnen. */
+	private static void submitIcon(PoseStack poseStack, SubmitNodeCollector collector, CooldownType type, float cx, float cy) {
+		Minecraft mc = Minecraft.getInstance();
+		ItemStackRenderState state = ICON_STATES[type.ordinal()];
+		mc.getItemModelResolver().updateForTopItem(state, type.icon(), ItemDisplayContext.GUI, mc.level, null, 0);
+		poseStack.pushPose();
+		poseStack.translate(cx, cy, 0);
+		poseStack.scale(ICON, -ICON, ICON);
+		state.submit(poseStack, collector, FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 0);
 		poseStack.popPose();
 	}
 
